@@ -52,8 +52,9 @@ public class DataCollector
 	private static final int DIARY_KANDARIN_HARD = 4477;
 	private static final int DIARY_KANDARIN_ELITE = 4478;
 
+	// Karamja diary uses different varbits - 3598 is the confirmed medium completion varbit
 	private static final int DIARY_KARAMJA_EASY = 3578;
-	private static final int DIARY_KARAMJA_MEDIUM = 3599;
+	private static final int DIARY_KARAMJA_MEDIUM = 3598;  // Was 3599, confirmed 3598 is correct for completion
 	private static final int DIARY_KARAMJA_HARD = 3611;
 	private static final int DIARY_KARAMJA_ELITE = 4566;
 

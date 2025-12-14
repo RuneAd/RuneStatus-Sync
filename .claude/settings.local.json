@@ -17,7 +17,8 @@
       "Bash(./gradlew.bat:*)",
       "Bash(curl:*)",
       "Bash(dir:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(\"$JAVA_HOME/bin/javap\" -cp build/libs/*-all.jar net.runelite.api.Skill)"
     ]
   }
 }
