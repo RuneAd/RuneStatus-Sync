@@ -3,7 +3,6 @@ package gg.runestatus.sync;
 import gg.runestatus.sync.data.CollectionLogItem;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
-import net.runelite.api.ItemComposition;
 import net.runelite.api.widgets.Widget;
 
 import javax.inject.Inject;
@@ -100,25 +99,14 @@ public class CollectionLogManager
 					continue;
 				}
 
-				ItemComposition itemDef = client.getItemDefinition(itemId);
-				if (itemDef == null)
-				{
-					continue;
-				}
-
-				String itemName = itemDef.getName();
-				if (itemName == null || itemName.isEmpty())
-				{
-					continue;
-				}
-
 				int quantity = child.getItemQuantity();
 				int opacity = child.getOpacity();
 
 				// Items with opacity 0 are obtained, items with higher opacity are not
 				boolean obtained = opacity == 0;
 
-				categoryItems.put(itemName, CollectionLogItem.builder()
+				// Use item ID as key (as string) for server pet detection
+				categoryItems.put(String.valueOf(itemId), CollectionLogItem.builder()
 					.obtained(obtained)
 					.count(obtained ? Math.max(quantity, 1) : 0)
 					.build());
