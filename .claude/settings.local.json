@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir:*)",
+      "Bash(rm:*)",
+      "Bash(./gradlew.bat build:*)",
+      "Bash(where:*)",
+      "Bash(dir \"C:\\Program Files\\Java\")",
+      "Bash(dir \"C:\\Program Files (x86)\\Java\")",
+      "Bash(set \"JAVA_HOME=C:\\Program Files\\Java\\jdk-25\")",
+      "Bash(export JAVA_HOME=\"C:/Program Files/Java/jdk-25\")"
+    ]
+  }
+}

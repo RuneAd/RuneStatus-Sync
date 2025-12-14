@@ -7,7 +7,7 @@ repositories {
 	maven {
 		url = 'https://repo.runelite.net'
 		content {
-			includeGroupByRegex("net\\.runelite.*")
+			includeGroupByRegex("net\.runelite.*")
 		}
 	}
 	mavenCentral()
@@ -26,8 +26,8 @@ dependencies {
 	testImplementation group: 'net.runelite', name:'jshell', version: runeLiteVersion
 }
 
-group = 'com.example'
-version = '1.0-SNAPSHOT'
+group = 'gg.runestatus'
+version = '1.0.0'
 
 tasks.withType(JavaCompile).configureEach {
 	options.encoding = 'UTF-8'
@@ -37,7 +37,7 @@ tasks.withType(JavaCompile).configureEach {
 tasks.register('shadowJar', Jar) {
 	dependsOn configurations.testRuntimeClasspath
 	manifest {
-		attributes('Main-Class': 'com.example.ExamplePluginTest', 'Multi-Release': true)
+		attributes('Main-Class': 'gg.runestatus.sync.RuneStatusPluginTest', 'Multi-Release': true)
 	}
 
 	duplicatesStrategy = DuplicatesStrategy.EXCLUDE
