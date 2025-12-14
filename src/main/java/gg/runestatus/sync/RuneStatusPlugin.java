@@ -8,6 +8,7 @@ import net.runelite.api.*;
 import net.runelite.api.events.*;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
+import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
@@ -50,6 +51,13 @@ public class RuneStatusPlugin extends Plugin
 	@Inject
 	private CollectionLogManager collectionLogManager;
 
+	@Inject
+	private EventBus eventBus;
+
+	private BurgerMenuManager burgerMenuManager;
+
+	private static final String RUNESTATUS_SYNC = "Sync to RuneStatus";
+
 	private final AtomicLong lastSyncTime = new AtomicLong(0);
 	private boolean loggedIn = false;
 	private boolean collectionLogOpen = false;
@@ -58,12 +66,38 @@ public class RuneStatusPlugin extends Plugin
 	protected void startUp()
 	{
 		log.info("RuneStatus Sync started");
+		System.out.println("[RuneStatus] startUp called");
+		System.out.println("[RuneStatus] Client is null: " + (client == null));
+		System.out.println("[RuneStatus] EventBus is null: " + (eventBus == null));
+
+		// Create BurgerMenuManager manually with injected dependencies
+		try
+		{
+			System.out.println("[RuneStatus] Creating BurgerMenuManager...");
+			burgerMenuManager = new BurgerMenuManager(client, eventBus);
+			System.out.println("[RuneStatus] BurgerMenuManager created");
+			burgerMenuManager.setOnSyncCallback(this::triggerManualSync);
+			System.out.println("[RuneStatus] Callback set, calling startUp...");
+			burgerMenuManager.startUp();
+			System.out.println("[RuneStatus] BurgerMenuManager startup complete");
+			log.info("BurgerMenuManager startup complete");
+		}
+		catch (Throwable e)
+		{
+			System.out.println("[RuneStatus] ERROR: " + e.getMessage());
+			log.error("Failed to create BurgerMenuManager: {}", e.getMessage(), e);
+			e.printStackTrace();
+		}
 	}
 
 	@Override
 	protected void shutDown()
 	{
 		log.info("RuneStatus Sync stopped");
+		if (burgerMenuManager != null)
+		{
+			burgerMenuManager.shutDown();
+		}
 		loggedIn = false;
 		collectionLogOpen = false;
 		collectionLogManager.clearCache();
@@ -140,8 +174,12 @@ public class RuneStatusPlugin extends Plugin
 	@Subscribe
 	public void onWidgetLoaded(WidgetLoaded event)
 	{
-		if (!config.enableSync() || !loggedIn || !config.syncCollectionLog())
+		// Log all widget loads to debug
+		log.info("Widget loaded: group={}", event.getGroupId());
+
+		if (!loggedIn)
 		{
+			log.info("Not logged in, ignoring widget load");
 			return;
 		}
 
@@ -149,7 +187,7 @@ public class RuneStatusPlugin extends Plugin
 		if (event.getGroupId() == COLLECTION_LOG_GROUP_ID)
 		{
 			collectionLogOpen = true;
-			log.debug("Collection log opened");
+			log.info("Collection log opened! collectionLogOpen={}", collectionLogOpen);
 		}
 	}
 
@@ -241,7 +279,25 @@ public class RuneStatusPlugin extends Plugin
 
 	private void performSync()
 	{
-		if (!config.enableSync())
+		performSyncInternal(false);
+	}
+
+	private void performManualSync()
+	{
+		performSyncInternal(true);
+	}
+
+	/**
+	 * Public method for BurgerMenuManager to trigger a manual sync
+	 */
+	public void triggerManualSync()
+	{
+		performManualSync();
+	}
+
+	private void performSyncInternal(boolean isManual)
+	{
+		if (!config.enableSync() && !isManual)
 		{
 			return;
 		}
@@ -261,7 +317,7 @@ public class RuneStatusPlugin extends Plugin
 			if (success)
 			{
 				log.debug("Successfully synced data for {}", username);
-				if (config.showSyncNotification())
+				if (isManual || config.showSyncNotification())
 				{
 					clientThread.invokeLater(() ->
 						client.addChatMessage(ChatMessageType.GAMEMESSAGE, "",
@@ -272,6 +328,13 @@ public class RuneStatusPlugin extends Plugin
 			else
 			{
 				log.warn("Failed to sync data for {}", username);
+				if (isManual)
+				{
+					clientThread.invokeLater(() ->
+						client.addChatMessage(ChatMessageType.GAMEMESSAGE, "",
+							"RuneStatus: Sync failed!", null)
+					);
+				}
 			}
 		});
 	}
