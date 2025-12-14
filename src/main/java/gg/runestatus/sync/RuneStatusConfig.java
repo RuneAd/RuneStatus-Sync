@@ -10,6 +10,14 @@ import net.runelite.client.config.Range;
 public interface RuneStatusConfig extends Config
 {
 	@ConfigSection(
+		name = "Privacy",
+		description = "Your privacy always comes first - we never store your IP address.",
+		position = -1,
+		closedByDefault = false
+	)
+	String privacySection = "privacy";
+
+	@ConfigSection(
 		name = "Sync Settings",
 		description = "Configure sync behavior",
 		position = 0

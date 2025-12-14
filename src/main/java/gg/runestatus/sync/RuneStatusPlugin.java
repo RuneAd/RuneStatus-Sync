@@ -22,7 +22,7 @@ import java.util.concurrent.atomic.AtomicLong;
 @Slf4j
 @PluginDescriptor(
 	name = "RuneStatus Sync",
-	description = "Sync your player data to RuneStatus.gg - We never store your IP address",
+	description = "Sync your player data to RuneStatus.gg. Your privacy always comes first - we never store your IP address.",
 	tags = {"runestatus", "sync", "stats", "hiscores", "profile"}
 )
 public class RuneStatusPlugin extends Plugin
