@@ -18,7 +18,6 @@ import javax.inject.Inject;
 import java.time.temporal.ChronoUnit;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.regex.Pattern;
 
 @Slf4j
 @PluginDescriptor(
@@ -29,9 +28,6 @@ import java.util.regex.Pattern;
 public class RuneStatusPlugin extends Plugin
 {
 	private static final int COLLECTION_LOG_GROUP_ID = 621;
-	private static final Pattern PET_MESSAGE_PATTERN = Pattern.compile(
-		"You have a funny feeling|You feel something weird sneaking|You have a feeling"
-	);
 
 	@Inject
 	private Client client;
@@ -56,9 +52,8 @@ public class RuneStatusPlugin extends Plugin
 
 	private BurgerMenuManager burgerMenuManager;
 
-	private static final String RUNESTATUS_SYNC = "Sync to RuneStatus";
-
 	private final AtomicLong lastSyncTime = new AtomicLong(0);
+	private volatile boolean isSyncing = false;
 	private boolean loggedIn = false;
 	private boolean collectionLogOpen = false;
 
@@ -66,27 +61,17 @@ public class RuneStatusPlugin extends Plugin
 	protected void startUp()
 	{
 		log.info("RuneStatus Sync started");
-		System.out.println("[RuneStatus] startUp called");
-		System.out.println("[RuneStatus] Client is null: " + (client == null));
-		System.out.println("[RuneStatus] EventBus is null: " + (eventBus == null));
 
-		// Create BurgerMenuManager manually with injected dependencies
+		// Create BurgerMenuManager for Collection Log hamburger menu button
 		try
 		{
-			System.out.println("[RuneStatus] Creating BurgerMenuManager...");
 			burgerMenuManager = new BurgerMenuManager(client, eventBus);
-			System.out.println("[RuneStatus] BurgerMenuManager created");
 			burgerMenuManager.setOnSyncCallback(this::triggerManualSync);
-			System.out.println("[RuneStatus] Callback set, calling startUp...");
 			burgerMenuManager.startUp();
-			System.out.println("[RuneStatus] BurgerMenuManager startup complete");
-			log.info("BurgerMenuManager startup complete");
 		}
-		catch (Throwable e)
+		catch (Exception e)
 		{
-			System.out.println("[RuneStatus] ERROR: " + e.getMessage());
 			log.error("Failed to create BurgerMenuManager: {}", e.getMessage(), e);
-			e.printStackTrace();
 		}
 	}
 
@@ -149,37 +134,10 @@ public class RuneStatusPlugin extends Plugin
 	}
 
 	@Subscribe
-	public void onChatMessage(ChatMessage event)
-	{
-		if (!config.enableSync() || !loggedIn)
-		{
-			return;
-		}
-
-		// Detect pet drops
-		if (event.getType() == ChatMessageType.GAMEMESSAGE)
-		{
-			String message = event.getMessage();
-			if (PET_MESSAGE_PATTERN.matcher(message).find())
-			{
-				log.debug("Pet drop detected, triggering sync");
-				if (shouldSync())
-				{
-					performSync();
-				}
-			}
-		}
-	}
-
-	@Subscribe
 	public void onWidgetLoaded(WidgetLoaded event)
 	{
-		// Log all widget loads to debug
-		log.info("Widget loaded: group={}", event.getGroupId());
-
 		if (!loggedIn)
 		{
-			log.info("Not logged in, ignoring widget load");
 			return;
 		}
 
@@ -187,7 +145,7 @@ public class RuneStatusPlugin extends Plugin
 		if (event.getGroupId() == COLLECTION_LOG_GROUP_ID)
 		{
 			collectionLogOpen = true;
-			log.info("Collection log opened! collectionLogOpen={}", collectionLogOpen);
+			log.debug("Collection log opened");
 		}
 	}
 
@@ -228,12 +186,6 @@ public class RuneStatusPlugin extends Plugin
 		if (!config.enableSync() || !loggedIn)
 		{
 			return;
-		}
-
-		// Process collection log if open
-		if (collectionLogOpen && config.syncCollectionLog())
-		{
-			collectionLogManager.processCollectionLogWidget();
 		}
 
 		// Check if we should sync based on interval
@@ -309,11 +261,19 @@ public class RuneStatusPlugin extends Plugin
 			return;
 		}
 
-		lastSyncTime.set(System.currentTimeMillis());
+		// Prevent concurrent syncs
+		if (isSyncing && !isManual)
+		{
+			return;
+		}
 
+		isSyncing = true;
 		PlayerSyncData data = buildSyncData();
 
 		runeStatusClient.syncPlayerData(data).thenAccept(success -> {
+			lastSyncTime.set(System.currentTimeMillis());
+			isSyncing = false;
+
 			if (success)
 			{
 				log.debug("Successfully synced data for {}", username);

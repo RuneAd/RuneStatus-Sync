@@ -3,24 +3,19 @@ package gg.runestatus.sync;
 import gg.runestatus.sync.data.CollectionLogItem;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
-import net.runelite.api.ScriptID;
+import net.runelite.api.ItemComposition;
 import net.runelite.api.widgets.Widget;
-import net.runelite.api.widgets.ComponentID;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 @Slf4j
 @Singleton
 public class CollectionLogManager
 {
 	private static final int COLLECTION_LOG_GROUP_ID = 621;
-	private static final Pattern COUNT_PATTERN = Pattern.compile("^(\\d+)$");
-	private static final Pattern OBTAINED_PATTERN = Pattern.compile("<col=([a-fA-F0-9]+)>");
 
 	private final Client client;
 
@@ -105,7 +100,18 @@ public class CollectionLogManager
 					continue;
 				}
 
-				String itemName = client.getItemDefinition(itemId).getName();
+				ItemComposition itemDef = client.getItemDefinition(itemId);
+				if (itemDef == null)
+				{
+					continue;
+				}
+
+				String itemName = itemDef.getName();
+				if (itemName == null || itemName.isEmpty())
+				{
+					continue;
+				}
+
 				int quantity = child.getItemQuantity();
 				int opacity = child.getOpacity();
 

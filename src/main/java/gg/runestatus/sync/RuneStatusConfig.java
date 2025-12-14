@@ -41,18 +41,6 @@ public interface RuneStatusConfig extends Config
 		return 5;
 	}
 
-	@ConfigItem(
-		keyName = "privacyNotice",
-		name = "Privacy Notice",
-		description = "We do NOT store your IP address. Your privacy is important to us.",
-		section = syncSection,
-		position = 2
-	)
-	default boolean privacyNotice()
-	{
-		return true;
-	}
-
 	@ConfigSection(
 		name = "Data Options",
 		description = "Choose what data to sync",

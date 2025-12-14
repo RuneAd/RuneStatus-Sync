@@ -11,7 +11,7 @@ import net.runelite.client.eventbus.Subscribe;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import java.util.*;
+import java.util.Objects;
 
 @Slf4j
 @Singleton
@@ -44,13 +44,12 @@ public class BurgerMenuManager
 	public void startUp()
 	{
 		eventBus.register(this);
-		log.info("BurgerMenuManager registered with EventBus");
+		log.debug("BurgerMenuManager registered with EventBus");
 	}
 
 	public void shutDown()
 	{
 		eventBus.unregister(this);
-		log.info("BurgerMenuManager unregistered from EventBus");
 	}
 
 	@Subscribe
@@ -61,38 +60,32 @@ public class BurgerMenuManager
 			return;
 		}
 
-		log.info("DRAW_BURGER_MENU script fired!");
-
 		Object[] args = event.getScriptEvent().getArguments();
 		if (args == null || args.length < 4)
 		{
-			log.info("Invalid args");
 			return;
 		}
 
 		int menuId = (int) args[3];
-		log.info("Menu ID: {}, Group: {}", menuId, menuId >> 16);
 
 		// Only add to collection log burger menu
 		int groupId = menuId >> 16;
 		if (groupId != COLLECTION_LOG_GROUP_ID)
 		{
-			log.debug("Not collection log menu, group is {}", groupId);
 			return;
 		}
 
 		try
 		{
-			log.info("Adding RuneStatus button to menu with ID: {}", menuId);
 			addButton(menuId);
 		}
 		catch (Exception e)
 		{
-			log.warn("Failed to add RuneStatus button to menu: {}", e.getMessage());
+			log.debug("Failed to add RuneStatus button to menu: {}", e.getMessage());
 		}
 	}
 
-	private void addButton(int menuId) throws NullPointerException, NoSuchElementException
+	private void addButton(int menuId)
 	{
 		Widget menu = Objects.requireNonNull(client.getWidget(menuId));
 		Widget[] menuChildren = Objects.requireNonNull(menu.getChildren());
@@ -102,30 +95,43 @@ public class BurgerMenuManager
 			baseMenuHeight = menu.getOriginalHeight();
 		}
 
-		List<Widget> reversedMenuChildren = new ArrayList<>(Arrays.asList(menuChildren));
-		Collections.reverse(reversedMenuChildren);
+		// Single pass to find last rectangle, last text, and check for existing button
+		Widget lastRectangle = null;
+		Widget lastText = null;
+		boolean existingButton = false;
 
-		Widget lastRectangle = reversedMenuChildren.stream()
-			.filter(w -> w.getType() == WidgetType.RECTANGLE)
-			.findFirst()
-			.orElseThrow(() -> new NoSuchElementException("No RECTANGLE widget found in menu"));
+		for (int i = menuChildren.length - 1; i >= 0; i--)
+		{
+			Widget w = menuChildren[i];
+			if (w == null)
+			{
+				continue;
+			}
 
-		Widget lastText = reversedMenuChildren.stream()
-			.filter(w -> w.getType() == WidgetType.TEXT)
-			.findFirst()
-			.orElseThrow(() -> new NoSuchElementException("No TEXT widget found in menu"));
+			if (lastRectangle == null && w.getType() == WidgetType.RECTANGLE)
+			{
+				lastRectangle = w;
+			}
+			if (lastText == null && w.getType() == WidgetType.TEXT)
+			{
+				lastText = w;
+			}
+			if (BUTTON_TEXT.equals(w.getText()))
+			{
+				existingButton = true;
+			}
+		}
+
+		if (lastRectangle == null || lastText == null)
+		{
+			return;
+		}
 
 		final int buttonHeight = lastRectangle.getHeight();
 		final int buttonY = lastRectangle.getOriginalY() + buttonHeight;
 
-		// Check if button already exists
-		final boolean existingButton = Arrays.stream(menuChildren)
-			.anyMatch(w -> w.getText() != null && w.getText().equals(BUTTON_TEXT));
-
 		if (!existingButton)
 		{
-			log.info("Creating new button at Y={}", buttonY);
-
 			final Widget background = menu.createChild(WidgetType.RECTANGLE)
 				.setOriginalWidth(lastRectangle.getOriginalWidth())
 				.setOriginalHeight(lastRectangle.getOriginalHeight())
@@ -153,8 +159,6 @@ public class BurgerMenuManager
 			text.setAction(0, "Sync to RuneStatus");
 			text.setOnOpListener((JavaScriptCallback) ev -> onButtonClick());
 			text.revalidate();
-
-			log.info("Button created successfully!");
 		}
 
 		if (menu.getOriginalHeight() <= baseMenuHeight)
@@ -171,7 +175,7 @@ public class BurgerMenuManager
 
 	private void onButtonClick()
 	{
-		log.info("RuneStatus sync button clicked!");
+		log.debug("RuneStatus sync button clicked");
 		client.addChatMessage(ChatMessageType.GAMEMESSAGE, "",
 			"RuneStatus: Syncing data...", null);
 		if (onSyncCallback != null)

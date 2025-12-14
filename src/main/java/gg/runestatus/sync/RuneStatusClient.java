@@ -33,7 +33,7 @@ public class RuneStatusClient
 
 		String json = gson.toJson(data);
 
-		log.info("Syncing player data to {} for user: {}", API_ENDPOINT, data.getUsername());
+		log.debug("Syncing player data for user: {}", data.getUsername());
 
 		Request request = new Request.Builder()
 			.url(API_ENDPOINT)
@@ -58,7 +58,7 @@ public class RuneStatusClient
 				{
 					if (response.isSuccessful())
 					{
-						log.info("Successfully synced player data to RuneStatus");
+						log.debug("Successfully synced player data to RuneStatus");
 						future.complete(true);
 					}
 					else

@@ -1,9 +1,18 @@
 package gg.runestatus.sync;
 
-import gg.runestatus.sync.data.*;
+import gg.runestatus.sync.data.CombatAchievementData;
+import gg.runestatus.sync.data.DiaryData;
+import gg.runestatus.sync.data.SkillData;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.*;
-import net.runelite.api.annotations.Varbit;
+import net.runelite.api.Client;
+import net.runelite.api.InventoryID;
+import net.runelite.api.Item;
+import net.runelite.api.ItemContainer;
+import net.runelite.api.Player;
+import net.runelite.api.Quest;
+import net.runelite.api.QuestState;
+import net.runelite.api.Skill;
+import net.runelite.api.Varbits;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -270,20 +279,5 @@ public class DataCollector
 		}
 
 		return equipment;
-	}
-
-	public PlayerSyncData collectAllData()
-	{
-		return PlayerSyncData.builder()
-			.username(getUsername())
-			.accountType(getAccountType())
-			.world(getWorld())
-			.skills(collectSkills())
-			.quests(collectQuests())
-			.achievementDiaries(collectAchievementDiaries())
-			.combatAchievements(collectCombatAchievements())
-			.equipment(collectEquipment())
-			.lastSyncedAt(System.currentTimeMillis())
-			.build();
 	}
 }
