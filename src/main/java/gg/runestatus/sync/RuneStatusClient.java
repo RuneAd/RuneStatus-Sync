@@ -15,17 +15,16 @@ import java.util.concurrent.CompletableFuture;
 public class RuneStatusClient
 {
 	private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
+	private static final String API_ENDPOINT = "https://api.runestatus.gg/plugin/sync";
 
 	private final OkHttpClient httpClient;
 	private final Gson gson;
-	private final RuneStatusConfig config;
 
 	@Inject
-	public RuneStatusClient(OkHttpClient httpClient, Gson gson, RuneStatusConfig config)
+	public RuneStatusClient(OkHttpClient httpClient, Gson gson)
 	{
 		this.httpClient = httpClient;
 		this.gson = gson;
-		this.config = config;
 	}
 
 	public CompletableFuture<Boolean> syncPlayerData(PlayerSyncData data)
@@ -33,12 +32,11 @@ public class RuneStatusClient
 		CompletableFuture<Boolean> future = new CompletableFuture<>();
 
 		String json = gson.toJson(data);
-		String endpoint = config.apiEndpoint();
 
-		log.info("Syncing player data to {} for user: {}", endpoint, data.getUsername());
+		log.info("Syncing player data to {} for user: {}", API_ENDPOINT, data.getUsername());
 
 		Request request = new Request.Builder()
-			.url(endpoint)
+			.url(API_ENDPOINT)
 			.post(RequestBody.create(JSON, json))
 			.header("Content-Type", "application/json")
 			.header("User-Agent", "RuneStatus-Sync/1.0")

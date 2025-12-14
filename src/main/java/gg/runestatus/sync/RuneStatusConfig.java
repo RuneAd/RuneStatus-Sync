@@ -42,15 +42,15 @@ public interface RuneStatusConfig extends Config
 	}
 
 	@ConfigItem(
-		keyName = "apiEndpoint",
-		name = "API Endpoint",
-		description = "RuneStatus API endpoint URL",
+		keyName = "privacyNotice",
+		name = "Privacy Notice",
+		description = "We do NOT store your IP address. Your privacy is important to us.",
 		section = syncSection,
 		position = 2
 	)
-	default String apiEndpoint()
+	default boolean privacyNotice()
 	{
-		return "https://api.runestatus.gg/plugin/sync";
+		return true;
 	}
 
 	@ConfigSection(
