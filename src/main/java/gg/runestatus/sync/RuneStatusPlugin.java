@@ -319,7 +319,9 @@ public class RuneStatusPlugin extends Plugin
 			builder.equipment(dataCollector.collectEquipment());
 		}
 
-		if (includeCollectionLog && config.syncCollectionLog() && collectionLogManager.hasData())
+		// Always include collection log if we have cached data and config allows it
+		// This prevents auto-sync from clearing collection log data on the server
+		if (config.syncCollectionLog() && collectionLogManager.hasData())
 		{
 			// Wrap items in a category structure as expected by the server
 			// Server expects: { "Category": { "itemId": { obtained, count } } }

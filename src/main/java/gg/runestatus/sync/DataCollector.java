@@ -88,13 +88,9 @@ public class DataCollector
 	private static final int DIARY_WILDERNESS_HARD = 4468;
 	private static final int DIARY_WILDERNESS_ELITE = 4469;
 
-	// Combat Achievement Varbits
-	private static final int CA_EASY_COMPLETE = 12855;
-	private static final int CA_MEDIUM_COMPLETE = 12856;
-	private static final int CA_HARD_COMPLETE = 12857;
-	private static final int CA_ELITE_COMPLETE = 12858;
-	private static final int CA_MASTER_COMPLETE = 12859;
-	private static final int CA_GRANDMASTER_COMPLETE = 12860;
+	// Combat Achievement Script - returns completed task count for a tier
+	// Script 4784 takes tier ID (1=Easy, 2=Medium, 3=Hard, 4=Elite, 5=Master, 6=Grandmaster)
+	private static final int CA_COMPLETED_COUNT_SCRIPT = 4784;
 
 	@Inject
 	public DataCollector(Client client)
@@ -248,14 +244,22 @@ public class DataCollector
 
 	public CombatAchievementData collectCombatAchievements()
 	{
+		// Script 4784 returns the completed task count for a given tier
+		// Tier IDs: 1=Easy, 2=Medium, 3=Hard, 4=Elite, 5=Master, 6=Grandmaster
 		return CombatAchievementData.builder()
-			.easy(client.getVarbitValue(CA_EASY_COMPLETE))
-			.medium(client.getVarbitValue(CA_MEDIUM_COMPLETE))
-			.hard(client.getVarbitValue(CA_HARD_COMPLETE))
-			.elite(client.getVarbitValue(CA_ELITE_COMPLETE))
-			.master(client.getVarbitValue(CA_MASTER_COMPLETE))
-			.grandmaster(client.getVarbitValue(CA_GRANDMASTER_COMPLETE))
+			.easy(getCompletedCombatAchievementCount(1))
+			.medium(getCompletedCombatAchievementCount(2))
+			.hard(getCompletedCombatAchievementCount(3))
+			.elite(getCompletedCombatAchievementCount(4))
+			.master(getCompletedCombatAchievementCount(5))
+			.grandmaster(getCompletedCombatAchievementCount(6))
 			.build();
+	}
+
+	private int getCompletedCombatAchievementCount(int tierId)
+	{
+		client.runScript(CA_COMPLETED_COUNT_SCRIPT, tierId);
+		return client.getIntStack()[0];
 	}
 
 	public Map<String, Integer> collectEquipment()
