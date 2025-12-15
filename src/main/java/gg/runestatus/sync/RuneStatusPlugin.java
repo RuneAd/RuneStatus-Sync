@@ -330,6 +330,13 @@ public class RuneStatusPlugin extends Plugin
 			collectionLog.put("All Items", items);
 			builder.collectionLog(collectionLog);
 			log.debug("Including {} collection log items in sync", items.size());
+
+			// Include collection log counts from the UI if available
+			if (collectionLogManager.hasCounts())
+			{
+				builder.collectionLogCounts(collectionLogManager.getCollectionLogCounts());
+				log.debug("Including collection log counts: {}", collectionLogManager.getCollectionLogCounts());
+			}
 		}
 
 		return builder.build();

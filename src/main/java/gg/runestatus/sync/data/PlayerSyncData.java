@@ -17,5 +17,6 @@ public class PlayerSyncData
 	private CombatAchievementData combatAchievements;
 	private Map<String, Integer> equipment;
 	private Map<String, Map<String, CollectionLogItem>> collectionLog;
+	private CollectionLogCounts collectionLogCounts;
 	private long lastSyncedAt;
 }
