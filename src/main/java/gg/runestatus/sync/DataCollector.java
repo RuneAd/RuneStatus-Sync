@@ -5,14 +5,12 @@ import gg.runestatus.sync.data.DiaryData;
 import gg.runestatus.sync.data.SkillData;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
-import net.runelite.api.InventoryID;
-import net.runelite.api.Item;
-import net.runelite.api.ItemContainer;
 import net.runelite.api.Player;
 import net.runelite.api.Quest;
 import net.runelite.api.QuestState;
 import net.runelite.api.Skill;
 import net.runelite.api.Varbits;
+import net.runelite.api.gameval.VarPlayerID;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -25,72 +23,47 @@ public class DataCollector
 {
 	private final Client client;
 
-	// Achievement Diary Varbits - completion status for each tier
-	// These varbits track whether each diary tier is complete (1) or not (0)
-	private static final int DIARY_ARDOUGNE_EASY = 4458;
-	private static final int DIARY_ARDOUGNE_MEDIUM = 4459;
-	private static final int DIARY_ARDOUGNE_HARD = 4460;
-	private static final int DIARY_ARDOUGNE_ELITE = 4461;
+	// Achievement Diary Script - returns completion info for a diary
+	// Script 2200 takes diary ID and returns completion data in intStack
+	// Reference: https://github.com/RuneStar/cs2-scripts/blob/master/scripts/%5Bproc%2Cdiary_completion_info%5D.cs2
+	private static final int DIARY_COMPLETION_SCRIPT = 2200;
 
-	private static final int DIARY_DESERT_EASY = 4483;
-	private static final int DIARY_DESERT_MEDIUM = 4484;
-	private static final int DIARY_DESERT_HARD = 4485;
-	private static final int DIARY_DESERT_ELITE = 4486;
-
-	private static final int DIARY_FALADOR_EASY = 4462;
-	private static final int DIARY_FALADOR_MEDIUM = 4463;
-	private static final int DIARY_FALADOR_HARD = 4464;
-	private static final int DIARY_FALADOR_ELITE = 4465;
-
-	private static final int DIARY_FREMENNIK_EASY = 4491;
-	private static final int DIARY_FREMENNIK_MEDIUM = 4492;
-	private static final int DIARY_FREMENNIK_HARD = 4493;
-	private static final int DIARY_FREMENNIK_ELITE = 4494;
-
-	private static final int DIARY_KANDARIN_EASY = 4475;
-	private static final int DIARY_KANDARIN_MEDIUM = 4476;
-	private static final int DIARY_KANDARIN_HARD = 4477;
-	private static final int DIARY_KANDARIN_ELITE = 4478;
-
-	// Karamja diary uses different varbits - 3598 is the confirmed medium completion varbit
-	private static final int DIARY_KARAMJA_EASY = 3578;
-	private static final int DIARY_KARAMJA_MEDIUM = 3598;  // Was 3599, confirmed 3598 is correct for completion
-	private static final int DIARY_KARAMJA_HARD = 3611;
-	private static final int DIARY_KARAMJA_ELITE = 4566;
-
-	private static final int DIARY_KOUREND_EASY = 7925;
-	private static final int DIARY_KOUREND_MEDIUM = 7926;
-	private static final int DIARY_KOUREND_HARD = 7927;
-	private static final int DIARY_KOUREND_ELITE = 7928;
-
-	private static final int DIARY_LUMBRIDGE_EASY = 4495;
-	private static final int DIARY_LUMBRIDGE_MEDIUM = 4496;
-	private static final int DIARY_LUMBRIDGE_HARD = 4497;
-	private static final int DIARY_LUMBRIDGE_ELITE = 4498;
-
-	private static final int DIARY_MORYTANIA_EASY = 4487;
-	private static final int DIARY_MORYTANIA_MEDIUM = 4488;
-	private static final int DIARY_MORYTANIA_HARD = 4489;
-	private static final int DIARY_MORYTANIA_ELITE = 4490;
-
-	private static final int DIARY_VARROCK_EASY = 4479;
-	private static final int DIARY_VARROCK_MEDIUM = 4480;
-	private static final int DIARY_VARROCK_HARD = 4481;
-	private static final int DIARY_VARROCK_ELITE = 4482;
-
-	private static final int DIARY_WESTERN_EASY = 4471;
-	private static final int DIARY_WESTERN_MEDIUM = 4472;
-	private static final int DIARY_WESTERN_HARD = 4473;
-	private static final int DIARY_WESTERN_ELITE = 4474;
-
-	private static final int DIARY_WILDERNESS_EASY = 4466;
-	private static final int DIARY_WILDERNESS_MEDIUM = 4467;
-	private static final int DIARY_WILDERNESS_HARD = 4468;
-	private static final int DIARY_WILDERNESS_ELITE = 4469;
+	// Diary IDs for script 2200
+	private static final int DIARY_ID_KARAMJA = 0;
+	private static final int DIARY_ID_ARDOUGNE = 1;
+	private static final int DIARY_ID_FALADOR = 2;
+	private static final int DIARY_ID_FREMENNIK = 3;
+	private static final int DIARY_ID_KANDARIN = 4;
+	private static final int DIARY_ID_DESERT = 5;
+	private static final int DIARY_ID_LUMBRIDGE = 6;
+	private static final int DIARY_ID_MORYTANIA = 7;
+	private static final int DIARY_ID_VARROCK = 8;
+	private static final int DIARY_ID_WILDERNESS = 9;
+	private static final int DIARY_ID_WESTERN = 10;
+	private static final int DIARY_ID_KOUREND = 11;
 
 	// Combat Achievement Script - returns completed task count for a tier
 	// Script 4784 takes tier ID (1=Easy, 2=Medium, 3=Hard, 4=Elite, 5=Master, 6=Grandmaster)
 	private static final int CA_COMPLETED_COUNT_SCRIPT = 4784;
+
+	// Combat Achievement total tasks per tier (as of 2024)
+	private static final int CA_EASY_TOTAL = 33;
+	private static final int CA_MEDIUM_TOTAL = 41;
+	private static final int CA_HARD_TOTAL = 129;
+	private static final int CA_ELITE_TOTAL = 182;
+	private static final int CA_MASTER_TOTAL = 150;
+	private static final int CA_GRANDMASTER_TOTAL = 90;
+	private static final int CA_TOTAL = CA_EASY_TOTAL + CA_MEDIUM_TOTAL + CA_HARD_TOTAL + CA_ELITE_TOTAL + CA_MASTER_TOTAL + CA_GRANDMASTER_TOTAL;
+
+	// VarcInt for time played in minutes
+	private static final int VARC_TIME_PLAYED = 526;
+
+	// All diary IDs for iterating
+	private static final int[] ALL_DIARY_IDS = {
+		DIARY_ID_KARAMJA, DIARY_ID_ARDOUGNE, DIARY_ID_FALADOR, DIARY_ID_FREMENNIK,
+		DIARY_ID_KANDARIN, DIARY_ID_DESERT, DIARY_ID_LUMBRIDGE, DIARY_ID_MORYTANIA,
+		DIARY_ID_VARROCK, DIARY_ID_WILDERNESS, DIARY_ID_WESTERN, DIARY_ID_KOUREND
+	};
 
 	@Inject
 	public DataCollector(Client client)
@@ -116,6 +89,119 @@ public class DataCollector
 	public int getWorld()
 	{
 		return client.getWorld();
+	}
+
+	public int getCombatLevel()
+	{
+		Player localPlayer = client.getLocalPlayer();
+		if (localPlayer != null)
+		{
+			return localPlayer.getCombatLevel();
+		}
+		return 0;
+	}
+
+	public int getTotalLevel()
+	{
+		int total = 0;
+		for (Skill skill : Skill.values())
+		{
+			if (skill == Skill.OVERALL)
+			{
+				continue;
+			}
+			total += client.getRealSkillLevel(skill);
+		}
+		return total;
+	}
+
+	public long getTotalXp()
+	{
+		long total = 0;
+		for (Skill skill : Skill.values())
+		{
+			if (skill == Skill.OVERALL)
+			{
+				continue;
+			}
+			total += client.getSkillExperience(skill);
+		}
+		return total;
+	}
+
+	public int getTimePlayedMinutes()
+	{
+		return client.getVarcIntValue(VARC_TIME_PLAYED);
+	}
+
+	/**
+	 * Gets the collection log obtained count from VarPlayer.
+	 * This is available anytime after login, no need to open collection log.
+	 */
+	public int getCollectionLogCount()
+	{
+		return client.getVarpValue(VarPlayerID.COLLECTION_COUNT);
+	}
+
+	/**
+	 * Returns [completed, total] quest counts
+	 */
+	public int[] getQuestCounts()
+	{
+		int completed = 0;
+		int total = 0;
+		for (Quest quest : Quest.values())
+		{
+			total++;
+			if (quest.getState(client) == QuestState.FINISHED)
+			{
+				completed++;
+			}
+		}
+		return new int[] { completed, total };
+	}
+
+	/**
+	 * Returns [completed, total] diary task counts across all regions
+	 */
+	public int[] getDiaryTaskCounts()
+	{
+		int completed = 0;
+		int total = 0;
+
+		for (int diaryId : ALL_DIARY_IDS)
+		{
+			client.runScript(DIARY_COMPLETION_SCRIPT, diaryId);
+			int[] stack = client.getIntStack();
+
+			// Easy
+			completed += stack[0];
+			total += stack[1];
+			// Medium
+			completed += stack[3];
+			total += stack[4];
+			// Hard
+			completed += stack[6];
+			total += stack[7];
+			// Elite
+			completed += stack[9];
+			total += stack[10];
+		}
+
+		return new int[] { completed, total };
+	}
+
+	/**
+	 * Returns [completed, total] combat achievement counts
+	 */
+	public int[] getCombatTaskCounts()
+	{
+		int completed = 0;
+		for (int tier = 1; tier <= 6; tier++)
+		{
+			completed += getCompletedCombatAchievementCount(tier);
+		}
+		return new int[] { completed, CA_TOTAL };
 	}
 
 	public Map<String, SkillData> collectSkills()
@@ -155,91 +241,67 @@ public class DataCollector
 	{
 		Map<String, DiaryData> diaries = new HashMap<>();
 
-		diaries.put("Ardougne", DiaryData.builder()
-			.easy(client.getVarbitValue(DIARY_ARDOUGNE_EASY) == 1)
-			.medium(client.getVarbitValue(DIARY_ARDOUGNE_MEDIUM) == 1)
-			.hard(client.getVarbitValue(DIARY_ARDOUGNE_HARD) == 1)
-			.elite(client.getVarbitValue(DIARY_ARDOUGNE_ELITE) == 1)
-			.build());
-
-		diaries.put("Desert", DiaryData.builder()
-			.easy(client.getVarbitValue(DIARY_DESERT_EASY) == 1)
-			.medium(client.getVarbitValue(DIARY_DESERT_MEDIUM) == 1)
-			.hard(client.getVarbitValue(DIARY_DESERT_HARD) == 1)
-			.elite(client.getVarbitValue(DIARY_DESERT_ELITE) == 1)
-			.build());
-
-		diaries.put("Falador", DiaryData.builder()
-			.easy(client.getVarbitValue(DIARY_FALADOR_EASY) == 1)
-			.medium(client.getVarbitValue(DIARY_FALADOR_MEDIUM) == 1)
-			.hard(client.getVarbitValue(DIARY_FALADOR_HARD) == 1)
-			.elite(client.getVarbitValue(DIARY_FALADOR_ELITE) == 1)
-			.build());
-
-		diaries.put("Fremennik", DiaryData.builder()
-			.easy(client.getVarbitValue(DIARY_FREMENNIK_EASY) == 1)
-			.medium(client.getVarbitValue(DIARY_FREMENNIK_MEDIUM) == 1)
-			.hard(client.getVarbitValue(DIARY_FREMENNIK_HARD) == 1)
-			.elite(client.getVarbitValue(DIARY_FREMENNIK_ELITE) == 1)
-			.build());
-
-		diaries.put("Kandarin", DiaryData.builder()
-			.easy(client.getVarbitValue(DIARY_KANDARIN_EASY) == 1)
-			.medium(client.getVarbitValue(DIARY_KANDARIN_MEDIUM) == 1)
-			.hard(client.getVarbitValue(DIARY_KANDARIN_HARD) == 1)
-			.elite(client.getVarbitValue(DIARY_KANDARIN_ELITE) == 1)
-			.build());
-
-		diaries.put("Karamja", DiaryData.builder()
-			.easy(client.getVarbitValue(DIARY_KARAMJA_EASY) == 1)
-			.medium(client.getVarbitValue(DIARY_KARAMJA_MEDIUM) == 1)
-			.hard(client.getVarbitValue(DIARY_KARAMJA_HARD) == 1)
-			.elite(client.getVarbitValue(DIARY_KARAMJA_ELITE) == 1)
-			.build());
-
-		diaries.put("Kourend & Kebos", DiaryData.builder()
-			.easy(client.getVarbitValue(DIARY_KOUREND_EASY) == 1)
-			.medium(client.getVarbitValue(DIARY_KOUREND_MEDIUM) == 1)
-			.hard(client.getVarbitValue(DIARY_KOUREND_HARD) == 1)
-			.elite(client.getVarbitValue(DIARY_KOUREND_ELITE) == 1)
-			.build());
-
-		diaries.put("Lumbridge & Draynor", DiaryData.builder()
-			.easy(client.getVarbitValue(DIARY_LUMBRIDGE_EASY) == 1)
-			.medium(client.getVarbitValue(DIARY_LUMBRIDGE_MEDIUM) == 1)
-			.hard(client.getVarbitValue(DIARY_LUMBRIDGE_HARD) == 1)
-			.elite(client.getVarbitValue(DIARY_LUMBRIDGE_ELITE) == 1)
-			.build());
-
-		diaries.put("Morytania", DiaryData.builder()
-			.easy(client.getVarbitValue(DIARY_MORYTANIA_EASY) == 1)
-			.medium(client.getVarbitValue(DIARY_MORYTANIA_MEDIUM) == 1)
-			.hard(client.getVarbitValue(DIARY_MORYTANIA_HARD) == 1)
-			.elite(client.getVarbitValue(DIARY_MORYTANIA_ELITE) == 1)
-			.build());
-
-		diaries.put("Varrock", DiaryData.builder()
-			.easy(client.getVarbitValue(DIARY_VARROCK_EASY) == 1)
-			.medium(client.getVarbitValue(DIARY_VARROCK_MEDIUM) == 1)
-			.hard(client.getVarbitValue(DIARY_VARROCK_HARD) == 1)
-			.elite(client.getVarbitValue(DIARY_VARROCK_ELITE) == 1)
-			.build());
-
-		diaries.put("Western Provinces", DiaryData.builder()
-			.easy(client.getVarbitValue(DIARY_WESTERN_EASY) == 1)
-			.medium(client.getVarbitValue(DIARY_WESTERN_MEDIUM) == 1)
-			.hard(client.getVarbitValue(DIARY_WESTERN_HARD) == 1)
-			.elite(client.getVarbitValue(DIARY_WESTERN_ELITE) == 1)
-			.build());
-
-		diaries.put("Wilderness", DiaryData.builder()
-			.easy(client.getVarbitValue(DIARY_WILDERNESS_EASY) == 1)
-			.medium(client.getVarbitValue(DIARY_WILDERNESS_MEDIUM) == 1)
-			.hard(client.getVarbitValue(DIARY_WILDERNESS_HARD) == 1)
-			.elite(client.getVarbitValue(DIARY_WILDERNESS_ELITE) == 1)
-			.build());
+		// Use script 2200 which is the authoritative source for diary completion
+		// This is the same method used by RuneProfile and other reliable plugins
+		diaries.put("Karamja", getDiaryDataFromScript(DIARY_ID_KARAMJA));
+		diaries.put("Ardougne", getDiaryDataFromScript(DIARY_ID_ARDOUGNE));
+		diaries.put("Falador", getDiaryDataFromScript(DIARY_ID_FALADOR));
+		diaries.put("Fremennik", getDiaryDataFromScript(DIARY_ID_FREMENNIK));
+		diaries.put("Kandarin", getDiaryDataFromScript(DIARY_ID_KANDARIN));
+		diaries.put("Desert", getDiaryDataFromScript(DIARY_ID_DESERT));
+		diaries.put("Lumbridge & Draynor", getDiaryDataFromScript(DIARY_ID_LUMBRIDGE));
+		diaries.put("Morytania", getDiaryDataFromScript(DIARY_ID_MORYTANIA));
+		diaries.put("Varrock", getDiaryDataFromScript(DIARY_ID_VARROCK));
+		diaries.put("Wilderness", getDiaryDataFromScript(DIARY_ID_WILDERNESS));
+		diaries.put("Western Provinces", getDiaryDataFromScript(DIARY_ID_WESTERN));
+		diaries.put("Kourend & Kebos", getDiaryDataFromScript(DIARY_ID_KOUREND));
 
 		return diaries;
+	}
+
+	/**
+	 * Gets diary completion data using script 2200.
+	 * The script returns completion info in intStack (12 values):
+	 * - stack[0] = easy completed count
+	 * - stack[1] = easy total count
+	 * - stack[3] = medium completed count
+	 * - stack[4] = medium total count
+	 * - stack[6] = hard completed count
+	 * - stack[7] = hard total count
+	 * - stack[9] = elite completed count
+	 * - stack[10] = elite total count
+	 * Reference: https://github.com/RuneStar/cs2-scripts/blob/master/scripts/%5Bproc%2Cdiary_completion_info%5D.cs2
+	 */
+	private DiaryData getDiaryDataFromScript(int diaryId)
+	{
+		client.runScript(DIARY_COMPLETION_SCRIPT, diaryId);
+		int[] stack = client.getIntStack();
+
+		// A tier is complete when completed count >= total count
+		int easyCompleted = stack[0];
+		int easyTotal = stack[1];
+		int mediumCompleted = stack[3];
+		int mediumTotal = stack[4];
+		int hardCompleted = stack[6];
+		int hardTotal = stack[7];
+		int eliteCompleted = stack[9];
+		int eliteTotal = stack[10];
+
+		boolean easy = easyTotal > 0 && easyCompleted >= easyTotal;
+		boolean medium = mediumTotal > 0 && mediumCompleted >= mediumTotal;
+		boolean hard = hardTotal > 0 && hardCompleted >= hardTotal;
+		boolean elite = eliteTotal > 0 && eliteCompleted >= eliteTotal;
+
+		log.debug("Diary {} - Easy: {}/{}, Medium: {}/{}, Hard: {}/{}, Elite: {}/{}",
+			diaryId, easyCompleted, easyTotal, mediumCompleted, mediumTotal,
+			hardCompleted, hardTotal, eliteCompleted, eliteTotal);
+
+		return DiaryData.builder()
+			.easy(easy)
+			.medium(medium)
+			.hard(hard)
+			.elite(elite)
+			.build();
 	}
 
 	public CombatAchievementData collectCombatAchievements()
@@ -260,29 +322,5 @@ public class DataCollector
 	{
 		client.runScript(CA_COMPLETED_COUNT_SCRIPT, tierId);
 		return client.getIntStack()[0];
-	}
-
-	public Map<String, Integer> collectEquipment()
-	{
-		Map<String, Integer> equipment = new HashMap<>();
-
-		ItemContainer equipmentContainer = client.getItemContainer(InventoryID.EQUIPMENT);
-		if (equipmentContainer == null)
-		{
-			return equipment;
-		}
-
-		Item[] items = equipmentContainer.getItems();
-		String[] slotNames = {"Head", "Cape", "Amulet", "Weapon", "Body", "Shield", "Legs", "Gloves", "Boots", "Ring", "Ammo"};
-
-		for (int i = 0; i < Math.min(items.length, slotNames.length); i++)
-		{
-			if (items[i] != null && items[i].getId() != -1)
-			{
-				equipment.put(slotNames[i], items[i].getId());
-			}
-		}
-
-		return equipment;
 	}
 }

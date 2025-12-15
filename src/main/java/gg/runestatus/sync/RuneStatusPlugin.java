@@ -1,7 +1,6 @@
 package gg.runestatus.sync;
 
 import com.google.inject.Provides;
-import gg.runestatus.sync.data.CollectionLogItem;
 import gg.runestatus.sync.data.PlayerSyncData;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ChatMessageType;
@@ -10,11 +9,8 @@ import net.runelite.api.GameState;
 import net.runelite.api.Skill;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.StatChanged;
-import net.runelite.api.events.WidgetClosed;
-import net.runelite.api.events.WidgetLoaded;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
-import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
@@ -22,8 +18,6 @@ import net.runelite.client.task.Schedule;
 
 import javax.inject.Inject;
 import java.time.temporal.ChronoUnit;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Slf4j
@@ -34,8 +28,6 @@ import java.util.concurrent.atomic.AtomicLong;
 )
 public class RuneStatusPlugin extends Plugin
 {
-	private static final int COLLECTION_LOG_GROUP_ID = 621;
-
 	@Inject
 	private Client client;
 
@@ -54,49 +46,24 @@ public class RuneStatusPlugin extends Plugin
 	@Inject
 	private CollectionLogManager collectionLogManager;
 
-	@Inject
-	private EventBus eventBus;
-
-	private BurgerMenuManager burgerMenuManager;
-
 	private final AtomicLong lastSyncTime = new AtomicLong(0);
 	private volatile boolean isSyncing = false;
 	private boolean loggedIn = false;
-	private boolean collectionLogOpen = false;
 
 	@Override
 	protected void startUp()
 	{
 		log.info("RuneStatus Sync started");
-
-		// Start CollectionLogManager to listen for script events
+		// Start CollectionLogManager to listen for chat messages (new collection log drops)
 		collectionLogManager.startUp();
-		collectionLogManager.setOnSyncComplete(this::performManualSyncWithCollectionLog);
-
-		// Create BurgerMenuManager for Collection Log hamburger menu button
-		try
-		{
-			burgerMenuManager = new BurgerMenuManager(client, eventBus);
-			burgerMenuManager.setOnSyncCallback(this::triggerManualSync);
-			burgerMenuManager.startUp();
-		}
-		catch (Exception e)
-		{
-			log.error("Failed to create BurgerMenuManager: {}", e.getMessage(), e);
-		}
 	}
 
 	@Override
 	protected void shutDown()
 	{
 		log.info("RuneStatus Sync stopped");
-		if (burgerMenuManager != null)
-		{
-			burgerMenuManager.shutDown();
-		}
 		collectionLogManager.shutDown();
 		loggedIn = false;
-		collectionLogOpen = false;
 	}
 
 	@Subscribe
@@ -119,7 +86,6 @@ public class RuneStatusPlugin extends Plugin
 		else if (event.getGameState() == GameState.LOGIN_SCREEN)
 		{
 			loggedIn = false;
-			collectionLogManager.clearItems();
 		}
 	}
 
@@ -141,32 +107,6 @@ public class RuneStatusPlugin extends Plugin
 		{
 			log.debug("Level up detected in {}, triggering sync", skill.getName());
 			performSync();
-		}
-	}
-
-	@Subscribe
-	public void onWidgetLoaded(WidgetLoaded event)
-	{
-		if (!loggedIn)
-		{
-			return;
-		}
-
-		// Collection log opened
-		if (event.getGroupId() == COLLECTION_LOG_GROUP_ID)
-		{
-			collectionLogOpen = true;
-			log.debug("Collection log opened");
-		}
-	}
-
-	@Subscribe
-	public void onWidgetClosed(WidgetClosed event)
-	{
-		if (event.getGroupId() == COLLECTION_LOG_GROUP_ID && collectionLogOpen)
-		{
-			collectionLogOpen = false;
-			log.debug("Collection log closed");
 		}
 	}
 
@@ -206,37 +146,7 @@ public class RuneStatusPlugin extends Plugin
 
 	private void performSync()
 	{
-		performSyncInternal(false, false);
-	}
-
-	/**
-	 * Called by CollectionLogManager after full collection log data is captured
-	 */
-	private void performManualSyncWithCollectionLog()
-	{
-		performSyncInternal(true, true);
-	}
-
-	/**
-	 * Public method for BurgerMenuManager to trigger a manual sync.
-	 * This triggers the full collection log capture via script 2240.
-	 */
-	public void triggerManualSync()
-	{
-		if (!collectionLogOpen)
-		{
-			// If collection log isn't open, just do a normal sync
-			performSyncInternal(true, false);
-			return;
-		}
-
-		// Trigger full collection log sync - this will call performManualSyncWithCollectionLog when complete
-		collectionLogManager.triggerFullSync();
-	}
-
-	private void performSyncInternal(boolean isManual, boolean includeCollectionLog)
-	{
-		if (!config.enableSync() && !isManual)
+		if (!config.enableSync())
 		{
 			return;
 		}
@@ -249,13 +159,13 @@ public class RuneStatusPlugin extends Plugin
 		}
 
 		// Prevent concurrent syncs
-		if (isSyncing && !isManual)
+		if (isSyncing)
 		{
 			return;
 		}
 
 		isSyncing = true;
-		PlayerSyncData data = buildSyncData(includeCollectionLog);
+		PlayerSyncData data = buildSyncData();
 
 		runeStatusClient.syncPlayerData(data).thenAccept(success -> {
 			lastSyncTime.set(System.currentTimeMillis());
@@ -264,7 +174,10 @@ public class RuneStatusPlugin extends Plugin
 			if (success)
 			{
 				log.debug("Successfully synced data for {}", username);
-				if (isManual || config.showSyncNotification())
+				// Clear recent drops after successful sync
+				collectionLogManager.clearRecentDrops();
+
+				if (config.showSyncNotification())
 				{
 					clientThread.invokeLater(() ->
 						client.addChatMessage(ChatMessageType.GAMEMESSAGE, "",
@@ -275,24 +188,34 @@ public class RuneStatusPlugin extends Plugin
 			else
 			{
 				log.warn("Failed to sync data for {}", username);
-				if (isManual)
-				{
-					clientThread.invokeLater(() ->
-						client.addChatMessage(ChatMessageType.GAMEMESSAGE, "",
-							"RuneStatus: Sync failed!", null)
-					);
-				}
 			}
 		});
 	}
 
-	private PlayerSyncData buildSyncData(boolean includeCollectionLog)
+	private PlayerSyncData buildSyncData()
 	{
+		// Get summary counts
+		int[] questCounts = dataCollector.getQuestCounts();
+		int[] diaryCounts = dataCollector.getDiaryTaskCounts();
+		int[] combatCounts = dataCollector.getCombatTaskCounts();
+
 		PlayerSyncData.PlayerSyncDataBuilder builder = PlayerSyncData.builder()
 			.username(dataCollector.getUsername())
 			.accountType(dataCollector.getAccountType())
 			.world(dataCollector.getWorld())
-			.lastSyncedAt(System.currentTimeMillis());
+			.lastSyncedAt(System.currentTimeMillis())
+			// Summary stats - always included
+			.combatLevel(dataCollector.getCombatLevel())
+			.totalLevel(dataCollector.getTotalLevel())
+			.totalXp(dataCollector.getTotalXp())
+			.questsCompleted(questCounts[0])
+			.questsTotal(questCounts[1])
+			.diaryTasksCompleted(diaryCounts[0])
+			.diaryTasksTotal(diaryCounts[1])
+			.combatTasksCompleted(combatCounts[0])
+			.combatTasksTotal(combatCounts[1])
+			.collectionLogObtained(dataCollector.getCollectionLogCount())
+			.timePlayedMinutes(dataCollector.getTimePlayedMinutes());
 
 		if (config.syncSkills())
 		{
@@ -314,29 +237,11 @@ public class RuneStatusPlugin extends Plugin
 			builder.combatAchievements(dataCollector.collectCombatAchievements());
 		}
 
-		if (config.syncEquipment())
+		// Include recent drops detected from chat messages
+		if (config.syncCollectionLog() && collectionLogManager.hasRecentDrops())
 		{
-			builder.equipment(dataCollector.collectEquipment());
-		}
-
-		// Always include collection log if we have cached data and config allows it
-		// This prevents auto-sync from clearing collection log data on the server
-		if (config.syncCollectionLog() && collectionLogManager.hasData())
-		{
-			// Wrap items in a category structure as expected by the server
-			// Server expects: { "Category": { "itemId": { obtained, count } } }
-			Map<String, CollectionLogItem> items = collectionLogManager.getCollectionLogItems();
-			Map<String, Map<String, CollectionLogItem>> collectionLog = new HashMap<>();
-			collectionLog.put("All Items", items);
-			builder.collectionLog(collectionLog);
-			log.debug("Including {} collection log items in sync", items.size());
-
-			// Include collection log counts from the UI if available
-			if (collectionLogManager.hasCounts())
-			{
-				builder.collectionLogCounts(collectionLogManager.getCollectionLogCounts());
-				log.debug("Including collection log counts: {}", collectionLogManager.getCollectionLogCounts());
-			}
+			builder.recentDrops(collectionLogManager.getRecentDropNames());
+			log.debug("Including {} recent drops from chat", collectionLogManager.getRecentDropNames().size());
 		}
 
 		return builder.build();

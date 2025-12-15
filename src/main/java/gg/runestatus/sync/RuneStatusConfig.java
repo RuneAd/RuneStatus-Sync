@@ -9,13 +9,14 @@ import net.runelite.client.config.Range;
 @ConfigGroup("runestatus")
 public interface RuneStatusConfig extends Config
 {
-	@ConfigSection(
+	@ConfigItem(
+		keyName = "privacyNotice",
 		name = "Privacy",
-		description = "Your privacy always comes first - we never store your IP address.",
+		description = "",
 		position = -1,
-		closedByDefault = false
+		warning = "Your privacy always comes first - we never store your IP address."
 	)
-	String privacySection = "privacy";
+	default void privacyNotice() {}
 
 	@ConfigSection(
 		name = "Sync Settings",
@@ -100,18 +101,6 @@ public interface RuneStatusConfig extends Config
 		position = 3
 	)
 	default boolean syncCombatAchievements()
-	{
-		return true;
-	}
-
-	@ConfigItem(
-		keyName = "syncEquipment",
-		name = "Sync Equipment",
-		description = "Sync currently equipped gear",
-		section = dataSection,
-		position = 4
-	)
-	default boolean syncEquipment()
 	{
 		return true;
 	}
