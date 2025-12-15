@@ -33,7 +33,8 @@ public class RuneStatusClient
 
 		String json = gson.toJson(data);
 
-		log.debug("Syncing player data for user: {}", data.getUsername());
+		log.info("Syncing player data for user: {}", data.getUsername());
+		log.info("Combat achievements data: {}", gson.toJson(data.getCombatAchievements()));
 
 		Request request = new Request.Builder()
 			.url(API_ENDPOINT)
